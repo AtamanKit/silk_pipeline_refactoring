@@ -1,0 +1,5 @@
+motor
+pydantic
+requests
+python-dotenv
+matplotlib

@@ -1,0 +1,28 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: silk_mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: silk_pipeline
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: silk_pipeline_app
+    depends_on:
+      - mongo
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: ["python", "main.py"]
+    env_file:
+      - .env
+
+volumes:
+  mongo_data:
