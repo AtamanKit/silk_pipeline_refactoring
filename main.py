@@ -1,27 +1,26 @@
-import os
-import sys
-import itertools
-import threading
-import time
-import asyncio  # added for async MongoDB operations
+import os, sys, itertools, threading, time
+import asyncio # added for async MongoDB operations
 from dotenv import load_dotenv
+from concurrent.futures import ProcessPoolExecutor
 
 from api_clients import QualysClient, CrowdstrikeClient
-from normalizers import QualysNormalizer, CrowdstrikeNormalizer
-from deduplicator import HostDeduplicator
+# from normalizers import QualysNormalizer, CrowdstrikeNormalizer
+# from deduplicator import HostDeduplicator
 # from db import MongoDBClient
-from db import AsyncMongoDBClient  # Updated to use async MongoDB client
+from db import AsyncMongoDBClient # Updated to use async MongoDB client  
 from visualizations.generate_charts import generate_all_charts
+from workers import vendor_worker
 # from models import NormalizedHost
 
 load_dotenv()
-
 
 def spinner():
     for char in itertools.cycle('|/-\\'):
         print(f'\r Working... still in progress... {char}', flush=True)
         time.sleep(5)
 
+async def colect(client):
+    return [host async for host in client.fetch_hosts()]
 
 async def main():
     # Load API tokens from environment
@@ -32,46 +31,41 @@ async def main():
     qualys_client = QualysClient(token_qualys)
     crowdstrike_client = CrowdstrikeClient(token_crowdstrike)
 
-    qualys_normalizer = QualysNormalizer()
-    crowdstrike_normalizer = CrowdstrikeNormalizer()
+    # Step1: Fetch both APIs concurrently (async parallel)
+    qualys_raw_hosts, crowdstrike_raw_hosts = await asyncio.gather(
+        colect(qualys_client),
+        colect(crowdstrike_client)
+    )
 
-    # Fetch + Normalize
-    qualys_hosts = [
-        qualys_normalizer.normalize(raw_host)
-        async for raw_host in qualys_client.fetch_hosts()
-    ]
+    print(f"Fetched {len(qualys_raw_hosts)} Qualys hosts")
+    print(f"Fetched {len(crowdstrike_raw_hosts)} Crowdstrike hosts")
 
-    crowdstrike_hosts = [
-        crowdstrike_normalizer.normalize(raw_host)
-        async for raw_host in crowdstrike_client.fetch_hosts()
-    ]
+    # Step2: Parallel normalize + deduplicate
+    loop = asyncio.get_event_loop()
+    with ProcessPoolExecutor() as executor:
+        future_q = loop.run_in_executor(executor, vendor_worker, qualys_raw_hosts, "qualys")
+        future_c = loop.run_in_executor(executor, vendor_worker, crowdstrike_raw_hosts, "crowdstrike")
 
-    print(f"Fetched {len(qualys_hosts)} Qualys hosts")
-    print(f"Fetched {len(crowdstrike_hosts)} Crowdstrike hosts")
+        qualys_hosts, crowdstrike_hosts = await asyncio.gather(future_q, future_c)
 
-    # Combine and deduplicate
+    print(f"After deduplication: {len(qualys_hosts) + len(crowdstrike_hosts)} unique hosts")
+    
+    # Step3: Combine and save
     all_hosts = qualys_hosts + crowdstrike_hosts
-    deduplicator = HostDeduplicator()
-    unique_hosts = deduplicator.deduplicate(all_hosts)
-    print(f"After deduplication: {len(unique_hosts)} unique hosts")
-
-    # Save to MongoDB
-    # db = MongoDBClient()
+    
     db = AsyncMongoDBClient()  # Use async MongoDB client
-    # db.save_hosts(unique_hosts)
-    await db._ensure_indexes()
-    await db.save_hosts(unique_hosts)  # Save hosts asynchronously
+    await db.save_hosts(all_hosts)  # Save hosts asynchronously
     print("Saved hosts to MongoDB")
 
     # Generate visualizations
-    generate_all_charts(unique_hosts)
+    generate_all_charts(all_hosts)
     print("Generated charts in visualizations/charts/")
 
 if __name__ == "__main__":
     threading.Thread(target=spinner, daemon=True).start()
 
     start_time = time.time()
-
+    
     asyncio.run(main())
 
     end_time = time.time()
