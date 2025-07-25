@@ -1,21 +1,27 @@
-import os, sys, itertools, threading, time
-import asyncio # added for async MongoDB operations
+import os
+import sys
+import itertools
+import threading
+import time
+import asyncio  # added for async MongoDB operations
 from dotenv import load_dotenv
 
 from api_clients import QualysClient, CrowdstrikeClient
 from normalizers import QualysNormalizer, CrowdstrikeNormalizer
 from deduplicator import HostDeduplicator
 # from db import MongoDBClient
-from db import AsyncMongoDBClient # Updated to use async MongoDB client  
+from db import AsyncMongoDBClient  # Updated to use async MongoDB client
 from visualizations.generate_charts import generate_all_charts
 # from models import NormalizedHost
 
 load_dotenv()
 
+
 def spinner():
     for char in itertools.cycle('|/-\\'):
         print(f'\r Working... still in progress... {char}', flush=True)
         time.sleep(5)
+
 
 async def main():
     # Load API tokens from environment
@@ -32,12 +38,12 @@ async def main():
     # Fetch + Normalize
     qualys_hosts = [
         qualys_normalizer.normalize(raw_host)
-        for raw_host in qualys_client.fetch_hosts()
+        async for raw_host in qualys_client.fetch_hosts()
     ]
 
     crowdstrike_hosts = [
         crowdstrike_normalizer.normalize(raw_host)
-        for raw_host in crowdstrike_client.fetch_hosts()
+        async for raw_host in crowdstrike_client.fetch_hosts()
     ]
 
     print(f"Fetched {len(qualys_hosts)} Qualys hosts")
@@ -65,8 +71,10 @@ if __name__ == "__main__":
     threading.Thread(target=spinner, daemon=True).start()
 
     start_time = time.time()
-    
+
     asyncio.run(main())
 
     end_time = time.time()
-    print(f"Completed in {end_time - start_time:.2f} seconds")
+
+    duration = end_time - start_time
+    print(f"Script completed in {duration: .2f} seconds")
