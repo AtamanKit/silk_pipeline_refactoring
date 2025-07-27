@@ -1,20 +1,15 @@
+# workers/parallel_tasks.py
+from typing import AsyncGenerator
 from normalizers import QualysNormalizer, CrowdstrikeNormalizer
-from deduplicator import HostDeduplicator
-from typing import List
+from models import NormalizedHost
 
-
-"""Function to handle parallel tasks for normalizing and deduplicating host data."""
-
-
-def vendor_worker(raw_hosts: List[dict], vendor: str) -> List:
+async def vendor_worker(raw_host_gen: AsyncGenerator[dict, None], vendor: str) -> AsyncGenerator[NormalizedHost, None]:
     if vendor == "qualys":
         normalizer = QualysNormalizer()
     elif vendor == "crowdstrike":
         normalizer = CrowdstrikeNormalizer()
     else:
         raise ValueError(f"Unsupported vendor: {vendor}")
-    
-    normalized = [normalizer.normalize(host) for host in raw_hosts]
-    deduplicator = HostDeduplicator()
 
-    return deduplicator.deduplicate(normalized)
+    async for raw in raw_host_gen:
+        yield normalizer.normalize(raw)

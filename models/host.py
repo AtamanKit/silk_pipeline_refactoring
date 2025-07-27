@@ -16,3 +16,4 @@ class NormalizedHost(BaseModel):
         None, description="Optional vendor-specific agent ID")
     mac_addresses: Optional[List[str]] = Field(
         default_factory=list, description="Optional MAC addresses")
+    unique_key: str = Field(..., description="Unique fingerprint key for deduplication")
