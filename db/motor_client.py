@@ -54,7 +54,19 @@ class AsyncMongoDBClient:
             if query["$or"]:
                 existing = await self.collection.find_one(query)
                 if existing:
-                    continue  # Skip duplicate
+                    existing_vendors = existing.get("vendor", [])
+                    if not isinstance(existing_vendors, list):
+                        existing_vendors = [existing_vendors]
+
+                    if set(host.vendor).difference(existing_vendors):
+                        updated_vendors = sorted(set(existing_vendors + host.vendor))
+
+                        await self.collection.update_one(
+                            {"_id": existing["_id"]},
+                            {"$set": {"vendor": updated_vendors}}
+                        )
+
+                    continue  # skip insert
 
             try:
                 await self.collection.insert_one(doc)

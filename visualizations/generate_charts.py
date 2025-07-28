@@ -8,10 +8,18 @@ from models import NormalizedHost
 
 def plot_vendor_distribution(hosts: List[NormalizedHost], save_dir: str = "visualizations/charts"):
     os.makedirs(save_dir, exist_ok=True)
-    vendor_counts = Counter([host.vendor for host in hosts])
+    # vendor_counts = Counter([host.vendor for host in hosts])
+    # vendor_counts = Counter(vendor for host in hosts for vendor in host.vendor)
+
+    # Count vendor *combinations* per host
+    vendor_combos = Counter(tuple(sorted(host.vendor)) for host in hosts)
+
+    # Convert tuple keys like ('crowdstrike', 'qualys') into string labels
+    labels = [' + '.join(v) for v in vendor_combos.keys()]
+    values = list(vendor_combos.values())
 
     plt.figure(figsize=(6, 6))
-    plt.pie(vendor_counts.values(), labels=vendor_counts.keys(), autopct='%1.1f%%', startangle=140)
+    plt.pie(values, labels=labels, autopct='%1.1f%%', startangle=140)
     plt.title("Vendor Distribution")
     plt.savefig(os.path.join(save_dir, "vendor_distribution.png"))
     plt.close()

@@ -44,7 +44,7 @@ class CrowdstrikeNormalizer(BaseNormalizer):
             ip_addresses=self._parse_ips(ip_strs),
             os=raw_host.get("os_version", "unknown"),
             last_seen=last_seen,
-            vendor="crowdstrike",
+            vendor=["crowdstrike"],
             agent_id=raw_host.get("device_id"),
             mac_addresses=macs or None,
             # unique_key=unique_key

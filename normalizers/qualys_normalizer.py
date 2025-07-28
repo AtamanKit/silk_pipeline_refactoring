@@ -49,7 +49,7 @@ class QualysNormalizer(BaseNormalizer):
             ip_addresses=parsed_ips,
             os=os,
             last_seen=last_seen,
-            vendor="qualys",
+            vendor=["qualys"],
             agent_id=agent_id,
             mac_addresses=macs,
             # unique_key=unique_key

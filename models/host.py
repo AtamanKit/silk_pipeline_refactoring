@@ -10,7 +10,7 @@ class NormalizedHost(BaseModel):
     os: str = Field(..., description="Operating system reported by the vendor")
     last_seen: datetime = Field(...,
                                 description="Datetime the host was last seen")
-    vendor: str = Field(...,
+    vendor: List[str] = Field(...,
                         description="Source of the host data, e.g., 'qualys', 'crowdstrike'")
     agent_id: Optional[str] = Field(
         None, description="Optional vendor-specific agent ID")
