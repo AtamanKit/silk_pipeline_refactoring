@@ -19,12 +19,7 @@ class AsyncMongoDBClient:
         self.collection = self.db[MONGO_COLLECTION]
 
     async def _ensure_indexes(self):
-        # Unique index for deduplication
-        await self.collection.create_index(
-            [("unique_key", ASCENDING)],
-            unique=True
-        )
-        # Optional secondary indexes
+        # Secondary indexes for query performance
         await self.collection.create_index([("hostname", ASCENDING)])
         await self.collection.create_index([("ip_addresses", ASCENDING)])
         await self.collection.create_index([("mac_addresses", ASCENDING)])
@@ -33,27 +28,39 @@ class AsyncMongoDBClient:
 
     async def save_hosts(self, hosts: List[NormalizedHost]) -> int:
         upserted_count = 0
-        
+
         for host in hosts:
-            # Convert model to dict
             doc = host.dict()
 
-            # Convert IP address objects to strings
-            doc["ip_addresses"] = [str(ip) for ip in doc.get("ip_addresses", [])]
+            # Normalize IP/MAC addresses to strings
+            doc["ip_addresses"] = [str(ip)
+                                   for ip in doc.get("ip_addresses", [])]
+            doc["mac_addresses"] = [str(mac)
+                                    for mac in doc.get("mac_addresses", [])]
 
-            # Convert MAC address objects to strings
-            doc["mac_addresses"] = [str(mac) for mac in doc.get("mac_addresses", [])]
+            # Deduplication query
+            query = {"$or": []}
+            if host.hostname:
+                query["$or"].append({"hostname": host.hostname})
+            if host.ip_addresses:
+                query["$or"].append({
+                    "ip_addresses": {"$in": [str(ip) for ip in host.ip_addresses]}
+                })
+            if host.mac_addresses:
+                query["$or"].append({
+                    "mac_addresses": {"$in": [str(mac) for mac in host.mac_addresses]}
+                })
 
-            # Perform an upsert based on unique_key
-            result =await self.collection.update_one(
-                {"unique_key": host.unique_key},
-                {"$set": doc},
-                upsert=True
-            )
+            if query["$or"]:
+                existing = await self.collection.find_one(query)
+                if existing:
+                    continue  # Skip duplicate
 
-            # If the document was inserted (not just updated))
-            if result.upserted_id or result.modified_count > 0:
+            try:
+                await self.collection.insert_one(doc)
                 upserted_count += 1
+            except Exception as e:
+                print(f"Insert error: {e}")
 
         return upserted_count
 

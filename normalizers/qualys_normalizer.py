@@ -30,8 +30,10 @@ class QualysNormalizer(BaseNormalizer):
 
         os = raw_host.get("os", "unknown")
 
-        last_seen_str = raw_host.get("agentInfo", {}).get("lastCheckedIn", {}).get("$date")
-        last_seen = datetime.fromisoformat(last_seen_str.replace("Z", "")) if last_seen_str else datetime.utcnow()
+        last_seen_str = raw_host.get("agentInfo", {}).get(
+            "lastCheckedIn", {}).get("$date")
+        last_seen = datetime.fromisoformat(last_seen_str.replace(
+            "Z", "")) if last_seen_str else datetime.utcnow()
 
         agent_id = raw_host.get("agentInfo", {}).get("agentId")
 
@@ -39,8 +41,8 @@ class QualysNormalizer(BaseNormalizer):
         parsed_ips = self._parse_ips(ip_strs)
 
         # Build unique key
-        ip_str_sorted = [str(ip) for ip in parsed_ips]
-        unique_key = f"{hostname.lower()}|{'|'.join(ip_str_sorted)}|qualys|{'|'.join(macs)}"
+        # ip_str_sorted = [str(ip) for ip in parsed_ips]
+        # unique_key = f"{hostname.lower()}|{'|'.join(ip_str_sorted)}|qualys|{'|'.join(macs)}"
 
         return NormalizedHost(
             hostname=hostname,
@@ -50,7 +52,7 @@ class QualysNormalizer(BaseNormalizer):
             vendor="qualys",
             agent_id=agent_id,
             mac_addresses=macs,
-            unique_key=unique_key
+            # unique_key=unique_key
         )
 
     def _parse_ips(self, ips: List[str]) -> List:
